@@ -19,6 +19,7 @@ CEntitySystem* g_pEntitySystem = nullptr;
 IMySQLClient *mysql_client;
 IMySQLConnection* connection;
 
+int server_id;
 const char *accessFlag;
 const char *categoryName;
 const char* itemName;
@@ -215,7 +216,6 @@ void LoadDatabase() {
         utils->ErrorLog("%s failed to load databases.cfg", g_PLAPI->GetLogTag());
         return;
     }
-
     KeyValues *database = databases->FindKey("vip", false);
     if (!database) {
         utils->ErrorLog("%s No `vip` field in databases.cfg", g_PLAPI->GetLogTag());
@@ -246,13 +246,16 @@ void LoadDatabase() {
 }
 
 void ChangeVipGroupViaDatabase(int slot, const char* group) {
+
+    dbgmsg("SERVER ID: %i", server_id);
     if (!IsPlayerValid(slot))
         return;
-    char buf[256];
+    char buf[1024];
     CCSPlayerController *player = CCSPlayerController::FromSlot(slot);
     uint64 acc = player->m_steamID.Get() - ACCOUNT_ID_OFFSET;
-    snprintf(buf, sizeof(buf), "UPDATE `vip_users` SET `group` = '%s' WHERE account_id = %llu", connection->Escape(group).c_str(), acc);
-    connection->Query(buf, [](ISQLQuery *pq){});
+    snprintf(buf, sizeof(buf), "UPDATE `vip_users` SET `group` = '%s' WHERE `account_id` = %llu AND `sid` = %i", connection->Escape(group).c_str(), acc, server_id);
+    dbgmsg(buf);
+    connection->Query(buf, [](ISQLQuery *pq) {});
 }
 
 void OpenVipGroupChangeMenu(int adminSlot, int target, long long currentTime) {
@@ -401,6 +404,14 @@ void LoadConfig() {
     time_list.clear();
     actual_to_display_group.clear();
     group_list.clear();
+    KeyValues *vip = new KeyValues("VIP");
+    const char *pathVip = "addons/configs/vip/groups.ini";
+    if (!vip->LoadFromFile(g_pFullFileSystem, pathVip)) {
+        utils->ErrorLog("Failed to load config file: %s", g_PLAPI->GetLogTag(), pathVip);
+        delete vip;
+        return;
+    }
+    server_id = vip->GetInt("server_id");
     KeyValues *config = new KeyValues("Config");
     const char *path = "addons/configs/admin_system/vip_admin.ini";
     if (!config->LoadFromFile(g_pFullFileSystem, path)) {
@@ -441,6 +452,7 @@ void LoadConfig() {
     accessFlag = config->GetString("accessFlag", "@admin/root");
     debug = config->GetBool("debug", false);
     delete config;
+    delete vip;
 }
 
 bool VipAdmin::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool late) {
@@ -542,5 +554,5 @@ const char *VipAdmin::GetURL() {
     return "";
 }
 const char *VipAdmin::GetVersion() {
-    return "1.0.0";
+    return "1.0.2";
 }
