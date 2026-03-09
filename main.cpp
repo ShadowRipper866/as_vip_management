@@ -316,7 +316,7 @@ void OpenVipSelectChangeMode(int admin, int target, long long time) {
     });
     menus_api->DisplayPlayerMenu(changeMode, admin, true, true);
 }
-
+void SelectVipPlayerMenu(int slot);
 void OpenVipChangeMenu(int adminSlot, int target) {
     bool isVip = vip_api->VIP_IsClientVIP(target);
     if (!isVip) {
@@ -346,7 +346,7 @@ void OpenVipChangeMenu(int adminSlot, int target) {
     menus_api->AddItemMenu(changeVipMenu, "deleteVip", admin_api->GetTranslation("VIPManagement_DeleteVIP"));
     menus_api->SetBackMenu(changeVipMenu, true);
     menus_api->SetExitMenu(changeVipMenu, true);
-    menus_api->SetCallback(changeVipMenu, [adminSlot, target, time](const char* szBack, const char* szFront, int iItem, int iSlot) {
+    menus_api->SetCallback(changeVipMenu, [target, time](const char* szBack, const char* szFront, int iItem, int adminSlot) {
         if (!strcmp(szBack, "back")) {
             OpenVipGiveMenu(adminSlot);
             return;
@@ -354,7 +354,7 @@ void OpenVipChangeMenu(int adminSlot, int target) {
         if (iItem < 7) {
             if (!strcmp(szBack, "deleteVip")) {
                 vip_api->VIP_RemoveClientVIP(target, true);
-                OpenVipGiveMenu(adminSlot);
+                SelectVipPlayerMenu(adminSlot);
             }
             else if (!strcmp(szBack, "vipExpires"))
                 OpenVipTimeChangeMenu(adminSlot, target, time);
@@ -365,13 +365,42 @@ void OpenVipChangeMenu(int adminSlot, int target) {
     menus_api->DisplayPlayerMenu(changeVipMenu, adminSlot, true, true);
 }
 
+void SelectVipPlayerMenu(int slot) {
+    Menu menu;
+    menu.clear();
+    menus_api->SetTitleMenu(menu, admin_api->GetTranslation("VIPManagement_SelectVIPPlayer"));
+    bool found = false;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!IsPlayerValid(i) || !vip_api->VIP_IsClientVIP(i))
+            continue;
+        CCSPlayerController*player = CCSPlayerController::FromSlot(i);
+        menus_api->AddItemMenu(menu, to_string(i).c_str(), player->m_iszPlayerName);
+        found = true;
+    }
+    if (!found)
+        menus_api->AddItemMenu(menu, "", admin_api->GetTranslation("CC_NoPlayers"), ITEM_DISABLED);
+    menus_api->SetBackMenu(menu, true);
+    menus_api->SetExitMenu(menu, true);
+    menus_api->SetCallback(menu, [](const char* szBack, const char* szFront, int iItem, int slot) {
+        if (!strcmp(szBack, "back")) {
+            admin_api->ShowAdminCategoryMenu(slot, "vip_management");
+            return;
+        }
+        if (iItem < 7) {
+            int target = atoi(szBack);
+            OpenVipChangeMenu(slot, target);
+        }
+    });
+    menus_api->DisplayPlayerMenu(menu, slot, true, true);
+}
+
 void OpenVipGiveMenu(int slot) {
     Menu menu;
     menu.clear();
     menus_api->SetTitleMenu(menu , admin_api->GetTranslation("VIPManagement_SelectPlayer"));
     bool found = false;
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (!IsPlayerValid(i))
+        if (!IsPlayerValid(i) || vip_api->VIP_IsClientVIP(i))
            continue;
         CCSPlayerController*player = CCSPlayerController::FromSlot(i);
         menus_api->AddItemMenu(menu, to_string(i).c_str(), player->m_iszPlayerName);
@@ -379,21 +408,20 @@ void OpenVipGiveMenu(int slot) {
     }
     if (!found)
         menus_api->AddItemMenu(menu, "", admin_api->GetTranslation("CC_NoPlayers"), ITEM_DISABLED);
-    menus_api->SetBackMenu(menu, false);
+    menus_api->SetBackMenu(menu, true);
     menus_api->SetExitMenu(menu, true);
-    menus_api->SetCallback(menu, [slot](const char* szBack, const char* szFront, int iItem, int iSlot) {
-        if (!strcmp(szBack, "back"))
+    menus_api->SetCallback(menu, [](const char* szBack, const char* szFront, int iItem, int slot) {
+        if (!strcmp(szBack, "back")) {
+            admin_api->ShowAdminCategoryMenu(slot, "vip_management");
             return;
+        }
         if (iItem < 7) {
             int target = atoi(szBack);
             if (!IsPlayerValid(target)) {
                 menus_api->ClosePlayerMenu(slot);
                 return;
             }
-            if (vip_api->VIP_IsClientVIP(target))
-                OpenVipChangeMenu(slot, target);
-            else
-                OpenGiveVipMenu(slot, target);
+            OpenGiveVipMenu(slot, target);
         }
     });
     menus_api->DisplayPlayerMenu(menu, slot, true, true);
@@ -464,6 +492,7 @@ bool VipAdmin::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool
     g_SMAPI->AddListener( this, this );
     return true;
 }
+
 void VipAdmin::AllPluginsLoaded() {
     int ret;
     char error[64] = { 0 };
@@ -517,11 +546,18 @@ void VipAdmin::AllPluginsLoaded() {
     }
     LoadConfig();
     LoadDatabase();
+    utils->HookEvent(g_PLID, "player_disconnect", [](const char* content, IGameEvent* event, bool broadcast) {
+        int slot = event->GetInt("userid");
+        pending_actions.erase(slot);
+    });
     utils->StartupServer(g_PLID, StartupServer);
     admin_api->OnCoreLoaded(g_PLID, []() {
         admin_api->RegisterCategory("vip_management", "Category_VIPManagement", nullptr);
         admin_api->RegisterItem("give_vip", "Item_GiveVIP", "vip_management", accessFlag, nullptr, [](int iSlot, const char* szCategory, const char* szIdentity, const char* szItem){
             OpenVipGiveMenu(iSlot);
+        });
+        admin_api->RegisterItem("edit_vip", "Item_EditVip", "vip_management", accessFlag, nullptr, [](int iSlot, const char* szCategory, const char* szIdentity, const char* szItem){
+            SelectVipPlayerMenu(iSlot);
         });
     });
 }
