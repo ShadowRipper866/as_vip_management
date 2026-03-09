@@ -39,6 +39,12 @@
         "ua"    "Керування VIP"
         "en"    "VIP Management"
     }
+	"Item_EditVip"
+	{
+		"ru"  "Изменить VIP"
+		"ua"  "Змінити VIP"
+		"en"  "Change VIP"
+	}
     "Item_GiveVIP"
     {
         "ru"    "Выдать VIP"
@@ -129,5 +135,6 @@
     "vip_management"
     {
         "item" "give_vip"
+        "item" "edit_vip"
     }
 ```
