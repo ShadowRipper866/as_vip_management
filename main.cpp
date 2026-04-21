@@ -20,9 +20,9 @@ IMySQLClient *mysql_client;
 IMySQLConnection* connection;
 
 int server_id;
-const char *accessFlag;
-const char *categoryName;
-const char* itemName;
+string accessFlag;
+string categoryName;
+string itemName;
 unordered_map<uint64, string> seconds_to_display_time;
 vector<pair<string, uint64>> time_list;
 unordered_map<string, string> actual_to_display_group;
@@ -211,7 +211,7 @@ void LoadDatabase() {
     if (connection != nullptr)
         return;
 
-    KeyValues *databases = new KeyValues("Databases");
+    std::shared_ptr<KeyValues> databases = std::make_shared<KeyValues>("Databases");
     if (!databases->LoadFromFile(g_pFullFileSystem, "addons/configs/databases.cfg")) {
         utils->ErrorLog("%s failed to load databases.cfg", g_PLAPI->GetLogTag());
         return;
@@ -219,7 +219,6 @@ void LoadDatabase() {
     KeyValues *database = databases->FindKey("vip", false);
     if (!database) {
         utils->ErrorLog("%s No `vip` field in databases.cfg", g_PLAPI->GetLogTag());
-        delete databases;
         return;
     }
 
@@ -237,11 +236,9 @@ void LoadDatabase() {
         if (!connect) {
             META_CONPRINTF("%s Failed to connect to MySQL\n", g_PLAPI->GetLogTag());
             connection = nullptr;
-            delete databases;
             return;
         }
         dbgmsg("Database connection created successfully");
-        delete databases;
     });
 }
 
@@ -432,19 +429,17 @@ void LoadConfig() {
     time_list.clear();
     actual_to_display_group.clear();
     group_list.clear();
-    KeyValues *vip = new KeyValues("VIP");
+    std::unique_ptr<KeyValues> vip = std::make_unique<KeyValues>("VIP");
     const char *pathVip = "addons/configs/vip/groups.ini";
     if (!vip->LoadFromFile(g_pFullFileSystem, pathVip)) {
         utils->ErrorLog("Failed to load config file: %s", g_PLAPI->GetLogTag(), pathVip);
-        delete vip;
         return;
     }
     server_id = vip->GetInt("server_id");
-    KeyValues *config = new KeyValues("Config");
+    std::unique_ptr<KeyValues> config = std::make_unique<KeyValues>("Config");
     const char *path = "addons/configs/admin_system/vip_admin.ini";
     if (!config->LoadFromFile(g_pFullFileSystem, path)) {
         utils->ErrorLog("Failed to load config file: %s", g_PLAPI->GetLogTag(), path);
-        delete config;
         return;
     }
 
@@ -479,8 +474,6 @@ void LoadConfig() {
         META_CONPRINTF("%s WARNING: Section 'groups' not found in config!\n", g_PLAPI->GetLogTag());
     accessFlag = config->GetString("accessFlag", "@admin/root");
     debug = config->GetBool("debug", false);
-    delete config;
-    delete vip;
 }
 
 bool VipAdmin::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool late) {
@@ -553,10 +546,10 @@ void VipAdmin::AllPluginsLoaded() {
     utils->StartupServer(g_PLID, StartupServer);
     admin_api->OnCoreLoaded(g_PLID, []() {
         admin_api->RegisterCategory("vip_management", "Category_VIPManagement", nullptr);
-        admin_api->RegisterItem("give_vip", "Item_GiveVIP", "vip_management", accessFlag, nullptr, [](int iSlot, const char* szCategory, const char* szIdentity, const char* szItem){
+        admin_api->RegisterItem("give_vip", "Item_GiveVIP", "vip_management", accessFlag.c_str(), nullptr, [](int iSlot, const char* szCategory, const char* szIdentity, const char* szItem){
             OpenVipGiveMenu(iSlot);
         });
-        admin_api->RegisterItem("edit_vip", "Item_EditVip", "vip_management", accessFlag, nullptr, [](int iSlot, const char* szCategory, const char* szIdentity, const char* szItem){
+        admin_api->RegisterItem("edit_vip", "Item_EditVip", "vip_management", accessFlag.c_str(), nullptr, [](int iSlot, const char* szCategory, const char* szIdentity, const char* szItem){
             SelectVipPlayerMenu(iSlot);
         });
     });
