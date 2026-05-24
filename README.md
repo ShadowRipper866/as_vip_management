@@ -8,6 +8,7 @@
 - [VIP Core](https://github.com/Pisex/cs2-vip/releases/latest)
 ---
 ### Пример конфигурации
+Путь: `addons/configs/admin_system/vip_admin.ini`
 ```ini
 "Config"
 {
