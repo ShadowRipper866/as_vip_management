@@ -130,6 +130,12 @@
         "ua"    "Точний час"
         "en"    "Exact time"
     }
+    "VIPManagement_SelectVIPPlayer"
+    {
+        "ru"    "Выберите VIP игрока"
+        "ua"    "Оберіть VIP гравця"
+        "en"    "Select VIP player"
+    }
 ```
 ### Добавить в `configs/admin_system/sorting.ini`
 ```
